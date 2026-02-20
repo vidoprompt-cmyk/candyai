@@ -9,6 +9,14 @@ require("dotenv").config();
 const app = express();
 
 /* ===============================
+   BASIC SECURITY CHECK
+=================================*/
+
+if (!process.env.MONGO_URI) {
+  console.error("MONGO_URI is missing in environment variables");
+}
+
+/* ===============================
    MIDDLEWARE
 =================================*/
 
@@ -18,12 +26,18 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 app.use("/uploads", express.static("uploads"));
 
 app.use(session({
-  secret: process.env.JWT_SECRET || "secret",
+  secret: process.env.JWT_SECRET || "supersecret",
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true
+  }
 }));
 
 app.use(passport.initialize());
@@ -39,26 +53,29 @@ app.use("/api/banner", require("./routes/bannerRoutes"));
 app.use("/api/story", require("./routes/storyRoutes"));
 
 /* ===============================
-   DATABASE
-=================================*/
-
-if (!mongoose.connections[0].readyState) {
-  mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.log(err));
-}
-
-/* ===============================
-   TEST ROUTE
+   ROOT TEST ROUTE
 =================================*/
 
 app.get("/", (req, res) => {
-  res.send("API Running");
+  res.status(200).send("API Running");
 });
 
 /* ===============================
-   LOCAL SERVER START (IMPORTANT)
-   Only runs locally, NOT on Vercel
+   DATABASE CONNECTION
+=================================*/
+
+if (!mongoose.connections[0].readyState) {
+  mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+    .then(() => console.log("MongoDB Connected"))
+    .catch(err => console.error("Mongo Error:", err));
+}
+
+/* ===============================
+   LOCAL SERVER START
+   (Vercel ignores this)
 =================================*/
 
 if (process.env.NODE_ENV !== "production") {
